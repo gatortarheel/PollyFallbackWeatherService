@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
+using Serilog;
 
 namespace WeatherService
 {
@@ -15,6 +16,6 @@ namespace WeatherService
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
             WebHost.CreateDefaultBuilder(args)
                 .UseStartup<Startup>()
-                .ConfigureLogging((context, builder) => builder.AddFilter<ConsoleLoggerProvider>(level => level == LogLevel.None));
+                .UseSerilog();
     }
 }
