@@ -69,26 +69,28 @@ namespace WeatherService
             {
                 client.BaseAddress = new Uri("http://localhost:6001/");
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
-            }).AddPolicyHandler(timeoutPolicySeconds3);
+                //client.Timeout = TimeSpan.FromSeconds(5);
+            });//.AddPolicyHandler(timeoutPolicySeconds3);
 
 
             services.AddHttpClient("TemperatureServiceAlpha", client =>
             {
                 client.BaseAddress = new Uri("http://localhost:6001/"); // TODO: actual paths  //
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
-            });//AddPolicyHandler(timeoutPolicySeconds3); // TODO: 3 second timeout  //
+                //client.Timeout = TimeSpan.FromSeconds(5);
+            }).AddPolicyHandler(timeoutPolicySeconds3); // TODO: 3 second timeout  //
 
             services.AddHttpClient("TemperatureServiceBeta", client =>
             {
                 client.BaseAddress = new Uri("http://localhost:6001/");
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
-            });//.AddPolicyHandler(timeoutPolicySeconds3); // TODO: 3 second timeout //
+            }).AddPolicyHandler(timeoutPolicySeconds3); // TODO: 3 second timeout //
 
             services.AddHttpClient("TemperatureServiceGamma", client =>
             {
                 client.BaseAddress = new Uri("http://localhost:6001/");
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
-            });//.AddPolicyHandler(timeoutPolicySeconds3); // TODO: 3 second timeout //
+            }).AddPolicyHandler(timeoutPolicySeconds3); // TODO: 3 second timeout //
 
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
         }

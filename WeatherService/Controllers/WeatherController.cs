@@ -19,144 +19,146 @@ namespace WeatherService.Controllers
         public string StickySessionClients = "StickySessionClients";
         public List<URLInstance> _urlInstances = new List<URLInstance>();
         private readonly IMemoryCache _memoryCache;
+        //  https://docs.microsoft.com/en-us/aspnet/core/performance/caching/memory?view=aspnetcore-6.0#use-setsize-size-and-sizelimit-to-limit-cache-size
 
         public WeatherController(ILogger<WeatherController> logger, IHttpClientFactory httpClientFactory, IMemoryCache memoryCache)
         {
             _httpClientFactory = httpClientFactory;
             _logger = logger;
             _memoryCache = memoryCache;
-            _memoryCache.Set("test", DateTime.Now, TimeSpan.FromDays(1));
-
-            _urlInstances.Add(new URLInstance
+            // idea put the urlInstances in the cache, which we can set to expire to restart the loop //
+            if (_memoryCache.Get(StickySessionClients) == null)
             {
-                Id = 1,
-                Failure = 0,
-                Name = "TemperatureServiceAlpha",
-                Success = 0,
-                URL = "http://localhost:6001/",
-                Path = @"/WeatherForecast/GetTemperatureAlpha"
-            });
-
-            _urlInstances.Add(new URLInstance
-            {
-                Id = 2,
-                Failure = 0,
-                Name = "TemperatureServiceBeta",
-                Success = 0,
-                URL = "http://localhost:6001/", ///WeatherForecast/GetTemperatureBeta
-                Path = @"/WeatherForecast/GetTemperatureBeta"
-            });
-
-            _urlInstances.Add(new URLInstance
-            {
-                Id = 3,
-                Failure = 0,
-                Name = "TemperatureServiceGamma",
-                Success = 0,
-                URL = "http://localhost:6001/",
-                Path = @"/WeatherForecast/GetTemperatureGamma"
-            });
+                LoadURLInstancesIntoTheCache();
+            }
         }
 
-        /*[HttpGet("{locationId}")]
-        public async Task<IActionResult> Get(int locationId)
+        private void LoadURLInstancesIntoTheCache()
         {
-            //var httpClient = _httpClientFactory.CreateClient("TemperatureServiceAlpha");
-            //HttpResponseMessage httpResponseMessage = await httpClient.GetAsync($"temperature/{locationId}");
+            if(_memoryCache.Get(StickySessionClients) == null)
+            {
+                _urlInstances.Add(new URLInstance
+                {
+                    Id = 1,
+                    Failure = 0,
+                    Name = "TemperatureServiceAlpha",
+                    Success = 0,
+                    URL = "http://localhost:6001/",
+                    Path = @"/WeatherForecast/GetTemperatureAlpha"
+                });
 
-            //var httpClientBeta = _httpClientFactory.CreateClient("TemperatureServiceBeta");
-            //HttpResponseMessage httpResponseMessageBeta = await httpClient.GetAsync($"temperature/{locationId}");
+                _urlInstances.Add(new URLInstance
+                {
+                    Id = 2,
+                    Failure = 0,
+                    Name = "TemperatureServiceBeta",
+                    Success = 0,
+                    URL = "http://localhost:6001/",
+                    Path = @"/WeatherForecast/GetTemperatureBeta"
+                });
 
-            //if (httpResponseMessage.IsSuccessStatusCode)
-            //{
-            //    var temperature = await httpResponseMessage.Content.ReadAsStringAsync();
-            //    return Ok(temperature);
-            // }
+                _urlInstances.Add(new URLInstance
+                {
+                    Id = 3,
+                    Failure = 0,
+                    Name = "TemperatureServiceGamma",
+                    Success = 0,
+                    URL = "http://localhost:6001/",
+                    Path = @"/WeatherForecast/GetTemperatureGamma"
+                });
+                _memoryCache.Set(StickySessionClients, _urlInstances);
+            }
+        }
 
-            var result = await GetTheTemperatureAsync(locationId);
-            return result;
+        private List<URLInstance> GetURLInstancesFromCache()
+        {
+            return _memoryCache.Get<List<URLInstance>>(StickySessionClients);
+        }
 
-            //return StatusCode((int)httpResponseMessage.StatusCode, httpResponseMessage.Content.ReadAsStringAsync());
-        }*/
+        private void UpdateURLInstanceCache()
+        {
+            _memoryCache.Set(StickySessionClients, _urlInstances);
+        }
+
+        [HttpGet()]
+        public async Task<List<URLInstance>> GetTheReport()
+        {
+            if (_memoryCache.Get(StickySessionClients) == null)
+            {
+                _memoryCache.Set(StickySessionClients, _urlInstances);
+            }
+            return _memoryCache.Get<List<URLInstance>>(StickySessionClients);
+        }
+
+
 
         [HttpGet("{locationId}")]
         public async Task<IActionResult> GetTheTemperatureAsync(int locationId)
         {
-            _logger.LogInformation("------------------starting GetTheTemperatureAsync --- switching off and on randomly to see if .NET picks it up. ");
-
-            if (HttpContext.Session.GetInt32(StickySessionKey) == null)
+            if(_memoryCache.Get(StickySessionKey) == null)
             {
-                _logger.LogInformation("------------------StickySessionKey is null ");
-                HttpContext.Session.SetInt32(StickySessionKey, 0);  // arrays are 0 based //
+                _memoryCache.Set(StickySessionKey, 0);
             }
 
-            //logging           
+            if(_urlInstances.Count == 0)
+            {
+                _urlInstances = GetURLInstancesFromCache();
+            }
+            // cache is application level 
 
- 
             try
             {
                 var attempts = 0;
-                var x = HttpContext.Session.GetInt32(StickySessionKey) ?? 0;
+                // var activeEndpoint = HttpContext.Session.GetInt32(StickySessionKey) ?? 0;
+                var activeEndpoint = _memoryCache.Get<int>(StickySessionKey);
 
                 while (attempts < _urlInstances.Count)
                 {
-                    _logger.LogInformation($"{StickySessionKey}: {HttpContext.Session.GetInt32(StickySessionKey)}");
-
-                    var client = _urlInstances[x];
-                    _logger.LogInformation($"attempt {attempts} {client.Name}");
+                    var client = _urlInstances[activeEndpoint];
                     var httpClient = _httpClientFactory.CreateClient(client.Name);
 
-                    HttpResponseMessage httpResponseMessage = await httpClient.GetAsync($"{client.Path}/{locationId}");
-                    if (httpResponseMessage.IsSuccessStatusCode)
+                    _logger.LogInformation($" Cache Key {StickySessionKey} | {activeEndpoint}");
+                    _logger.LogInformation($"{ client.Name} | Attempt | {attempts} ");
+
+                    try
                     {
-                        client.Success++;
-                        HttpContext.Session.SetInt32(StickySessionKey, x);
-                        _logger.LogInformation($"StickySessionKey set to: {x} {client.Name}");
-                        _logger.LogInformation($"success: {client.Name}");
-                        return StatusCode((int)httpResponseMessage.StatusCode, httpResponseMessage.Content.ReadAsStringAsync());
-                    }
-                    else
-                    {
-                        client.Failure++;
-                        _logger.LogInformation($"*** Failure Count : {client.Name} : {client.Failure}");
-                        x++;
-                        if (x > 2)
+                        HttpResponseMessage httpResponseMessage = await httpClient.GetAsync($"{client.Path}/{locationId}");
+                        if (httpResponseMessage.IsSuccessStatusCode)
                         {
-                            x = 0;
+                            client.Success++;
+                            UpdateURLInstanceCache();
+                            //HttpContext.Session.SetInt32(StickySessionKey, activeEndpoint);
+                            _memoryCache.Set(StickySessionKey, activeEndpoint); 
+                            _logger.LogInformation($"{client.Name} | Success | {httpResponseMessage.StatusCode} ");
+                            return StatusCode((int)httpResponseMessage.StatusCode, httpResponseMessage.Content.ReadAsStringAsync());
+                        }
+                        else
+                        {
+                            _logger.LogInformation($"{client.Name} | Not successful | {httpResponseMessage.StatusCode}");
                         }
                     }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError($"{client.Name} | Exception {ex.Message} | {ex.StackTrace}");
+                    }
+
+                    // move to the next item in the client array //
+                    activeEndpoint++;
+                    if (activeEndpoint > 2)
+                    {
+                        activeEndpoint = 0;
+                    }
+                    client.Failure++;
+                    UpdateURLInstanceCache();
                     attempts++;
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogCritical($"Exception :{ ex.Message} | {ex.StackTrace}");
+                _logger.LogError($"Exception | { ex.Message} | {ex.StackTrace}");
             }
-            /*
-            
-            else
-            {
-                // get the next client Beta for now // 
-                var httpClientBeta = _httpClientFactory.CreateClient("TemperatureServiceBeta"); //WeatherForecast / GetTemperatureBeta
-                httpResponseMessage = await httpClientBeta.GetAsync($"/WeatherForecast/GetTemperatureBeta/{locationId}");
-                if (httpResponseMessage.IsSuccessStatusCode)
-                {
-                    HttpContext.Session.SetString(StickySessionKey, "TemperatureServiceBeta"); 
-                }
-            }*/
-            //
-            return StatusCode((int)HttpStatusCode.InternalServerError, "Something went wrong when getting the temperature.");
-            // return StatusCode((int)httpResponseMessage.StatusCode, httpResponseMessage.Content.ReadAsStringAsync());
+           
+            return StatusCode((int)HttpStatusCode.InternalServerError, "Cloud Instance not responding, use local data.");
         }
-
-
-        /*static URLInstance GetNextURL()
-        {
-            
-            yield return "TemperatureServiceAlpha";
-            yield return "TemperatureServiceBeta";
-            yield return "TemperatureServiceGamma";
-        }*/
-
     }
 }
