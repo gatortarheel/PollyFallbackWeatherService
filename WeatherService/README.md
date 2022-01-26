@@ -1,21 +1,22 @@
 ﻿# Round Robin with Multiple Endpoints
 ## Goals: 
-- Set up a way to gracefully and quickly fail on endpoints that need to be load balanced, but have not been set up yet.
-- Keep using an active endpoint for subsequent calls.
+- Set up a way to gracefully and quickly fail on endpoints that need to be load balanced, but where that load balancing has not been set up.
+- Keep using a known active endpoint for subsequent calls.
 - If an endpoint is down or doesn't respond within a time frame, move on to the next one.
-- If all endpoints fail, tell the calling API to use the data it has.
+- If all endpoints fail, tell the calling API to use local data.
+- Log information while endpoint healthchecks are set up.
 ----
 
 ## Weather API 
-Weather API is the source of the API calls.  
-
-For this test, there are three instances.  The only parameter is a locationId, which is used to make the end points break or slow down.
+Weather API has three endpoints that may or may not be operational.
+The parameter is locationId, which is used to make the end points break or slow down.
 Each returns its name – Alpha | Beta | Gamma.
-The name is returned prov
-![alt text](weatherapi1.png)
+The name is returned to show which endpoint was used to provide the data.
 
+![alt text](/docs/weatherapi1.png)
 
-- Alpha is programmed to be slow – it has a thread sleep command that makes it sleep for locationId * 1000 ms.  Also, if the locationId is **5** – it breaks.
+### The Endpoints
+- Alpha is programmed to be slow – it has a thread sleep command that makes it sleep for locationId * 1000 ms.  Also, if the locationId is **5** – it fails.
 
  ```CSharp
  [HttpGet]
@@ -36,18 +37,19 @@ The name is returned prov
         }
 ```
 
-- Beta breaks if the locationId is **10**.
+- Beta fails if the locationId is **10**.
 
-- Gamma breaks if the locationId is **15**.
+- Gamma fails if the locationId is **15**.
 
 
  ---
 
  ## Weather Service
-This is the consumer that needs to respond and fail gracefully.
+This is the consumer that needs to track which endpoint is operational and if all else fails, fail gracefully.
 
- ### Startup
- Add the required features to make this work.
+ ### Startup.cs
+ Set up logging, caching, Polly, and the three endpoints.
+ 
 
  - Add logging
  ```CSharp
