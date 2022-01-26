@@ -13,7 +13,7 @@ The parameter is locationId, which is used to make the end points break or slow 
 Each returns its name – Alpha | Beta | Gamma.
 The name is returned to show which endpoint was used to provide the data.
 
-![alt text](/docs/weatherapi1.png)
+![alt text](docs/weatherapi1.png)
 
 ### The Endpoints
 - Alpha is programmed to be slow – it has a thread sleep command that makes it sleep for locationId * 1000 ms.  Also, if the locationId is **5** – it fails.
