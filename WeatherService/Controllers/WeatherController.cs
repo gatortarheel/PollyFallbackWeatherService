@@ -81,7 +81,7 @@ namespace WeatherService.Controllers
         }
 
         [HttpGet()]
-        public async Task<List<URLInstance>> GetTheReport()
+        public List<URLInstance> GetTheReport()
         {
             if (_memoryCache.Get(StickySessionClients) == null)
             {
@@ -109,7 +109,6 @@ namespace WeatherService.Controllers
             try
             {
                 var attempts = 0;
-                // var activeEndpoint = HttpContext.Session.GetInt32(StickySessionKey) ?? 0;
                 var activeEndpoint = _memoryCache.Get<int>(StickySessionKey);
 
                 while (attempts < _urlInstances.Count)
@@ -127,7 +126,6 @@ namespace WeatherService.Controllers
                         {
                             client.Success++;
                             UpdateURLInstanceCache();
-                            //HttpContext.Session.SetInt32(StickySessionKey, activeEndpoint);
                             _memoryCache.Set(StickySessionKey, activeEndpoint); 
                             _logger.LogInformation($"{client.Name} | Success | {httpResponseMessage.StatusCode} ");
                             return StatusCode((int)httpResponseMessage.StatusCode, httpResponseMessage.Content.ReadAsStringAsync());
@@ -151,6 +149,11 @@ namespace WeatherService.Controllers
                     client.Failure++;
                     UpdateURLInstanceCache();
                     attempts++;
+
+                    if(attempts > 3)
+                    {
+                        return StatusCode((int)HttpStatusCode.InternalServerError, "Cloud Instance not responding, use local data.");
+                    }
                 }
             }
             catch (Exception ex)
